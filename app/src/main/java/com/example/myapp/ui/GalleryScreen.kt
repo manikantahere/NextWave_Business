@@ -15,16 +15,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.decode.VideoFrameDecoder
+import com.example.myapp.R
 import com.example.myapp.data.VideoItem
 import com.example.myapp.data.fetchLocalVideos
 import com.example.myapp.data.formatDuration
@@ -58,7 +59,7 @@ fun GalleryScreen(onVideoSelect: (VideoItem) -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("VLC Video Library", color = Color.White) },
+                title = { Text(stringResource(id = R.string.library_title), color = Color.White) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF1E1E1E))
             )
         },
@@ -106,7 +107,6 @@ fun GalleryScreen(onVideoSelect: (VideoItem) -> Unit) {
 fun VideoCard(video: VideoItem, onClick: () -> Unit) {
     val context = LocalContext.current
     
-    // Calculate saved watch progress percentage
     val savedPos = PlaybackCache.positionMap[video.uri.toString()] ?: 0L
     val progress = if (video.duration > 0) (savedPos.toFloat() / video.duration.toFloat()).coerceIn(0f, 1f) else 0f
 
@@ -134,7 +134,6 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
                     contentScale = ContentScale.Crop
                 )
 
-                // "Resume" tag for discontinued videos
                 if (progress > 0.05f && progress < 0.95f) {
                     Text(
                         text = "▶ Resume",
@@ -148,7 +147,6 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
                     )
                 }
 
-                // Duration Badge
                 Text(
                     text = formatDuration(video.duration),
                     color = Color.White,
@@ -160,7 +158,6 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
 
-                // Red Watch Progress Bar (like YouTube/VLC)
                 if (progress > 0f) {
                     LinearProgressIndicator(
                         progress = { progress },
