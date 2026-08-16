@@ -7,15 +7,18 @@ import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Brightness7
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
@@ -41,15 +45,17 @@ fun PlayerScreen(videoUri: Uri, onBackClick: () -> Unit) {
     val activity = context as? Activity
     val coroutineScope = rememberCoroutineScope()
 
-    // Audio Manager for Volume control
     val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val maxVolume = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
 
-    // State variables for gesture feedback overlays
+    // State variables
     var showRewindOverlay by remember { mutableStateOf(false) }
     var showForwardOverlay by remember { mutableStateOf(false) }
     var showBrightnessOverlay by remember { mutableStateOf(false) }
     var showVolumeOverlay by remember { mutableStateOf(false) }
+    var showSpeedDialog by remember { mutableStateOf(false) }
+
+    var currentSpeed by remember { mutableFloatStateOf(1.0f) }
 
     var brightnessLevel by remember {
         mutableFloatStateOf(
@@ -104,7 +110,6 @@ fun PlayerScreen(videoUri: Uri, onBackClick: () -> Unit) {
 
         // Transparent Touch Overlay split into Left (Brightness / Rewind) and Right (Volume / FastForward)
         Row(modifier = Modifier.fillMaxSize()) {
-            // LEFT HALF: Brightness Drag & Rewind Double-Tap
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -146,7 +151,6 @@ fun PlayerScreen(videoUri: Uri, onBackClick: () -> Unit) {
                     }
             )
 
-            // RIGHT HALF: Volume Drag & Fast-Forward Double-Tap
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -187,9 +191,40 @@ fun PlayerScreen(videoUri: Uri, onBackClick: () -> Unit) {
             )
         }
 
+        // Top Control Bar (Back Button + Speed Button)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .align(Alignment.TopCenter),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBackClick,
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White
+                )
+            }
+
+            IconButton(
+                onClick = { showSpeedDialog = true },
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), shape = CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Speed,
+                    contentDescription = "Playback Speed",
+                    tint = Color.White
+                )
+            }
+        }
+
         // --- OVERLAY INDICATORS ---
 
-        // Seek Rewind (-10s)
         AnimatedVisibility(
             visible = showRewindOverlay,
             enter = fadeIn(tween(150)),
@@ -199,7 +234,6 @@ fun PlayerScreen(videoUri: Uri, onBackClick: () -> Unit) {
             SeekIndicator(icon = Icons.Default.FastRewind, text = "-10s")
         }
 
-        // Seek Forward (+10s)
         AnimatedVisibility(
             visible = showForwardOverlay,
             enter = fadeIn(tween(150)),
@@ -209,7 +243,6 @@ fun PlayerScreen(videoUri: Uri, onBackClick: () -> Unit) {
             SeekIndicator(icon = Icons.Default.FastForward, text = "+10s")
         }
 
-        // Brightness Overlay (Left Center)
         AnimatedVisibility(
             visible = showBrightnessOverlay,
             enter = fadeIn(tween(150)),
@@ -219,7 +252,6 @@ fun PlayerScreen(videoUri: Uri, onBackClick: () -> Unit) {
             LevelIndicator(icon = Icons.Default.Brightness7, value = brightnessLevel, label = "Brightness")
         }
 
-        // Volume Overlay (Right Center)
         AnimatedVisibility(
             visible = showVolumeOverlay,
             enter = fadeIn(tween(150)),
@@ -227,6 +259,55 @@ fun PlayerScreen(videoUri: Uri, onBackClick: () -> Unit) {
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 32.dp)
         ) {
             LevelIndicator(icon = Icons.Default.VolumeUp, value = volumeLevel, label = "Volume")
+        }
+
+        // --- SPEED SELECTION DIALOG ---
+        if (showSpeedDialog) {
+            val speedOptions = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+
+            AlertDialog(
+                onDismissRequest = { showSpeedDialog = false },
+                title = { Text("Playback Speed", color = Color.White) },
+                containerColor = Color(0xFF252525),
+                text = {
+                    Column {
+                        speedOptions.forEach { speed ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        currentSpeed = speed
+                                        exoPlayer.playbackParameters = PlaybackParameters(speed)
+                                        showSpeedDialog = false
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = (currentSpeed == speed),
+                                    onClick = {
+                                        currentSpeed = speed
+                                        exoPlayer.playbackParameters = PlaybackParameters(speed)
+                                        showSpeedDialog = false
+                                    },
+                                    colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFF5722))
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (speed == 1.0f) "Normal (1.0x)" else "${speed}x",
+                                    color = Color.White,
+                                    fontSize = 15.sp
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showSpeedDialog = false }) {
+                        Text("Cancel", color = Color(0xFFFF5722))
+                    }
+                }
+            )
         }
     }
 }
