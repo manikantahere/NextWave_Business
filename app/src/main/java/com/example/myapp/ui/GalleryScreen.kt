@@ -105,6 +105,10 @@ fun GalleryScreen(onVideoSelect: (VideoItem) -> Unit) {
 @Composable
 fun VideoCard(video: VideoItem, onClick: () -> Unit) {
     val context = LocalContext.current
+    
+    // Calculate saved watch progress percentage
+    val savedPos = PlaybackCache.positionMap[video.uri.toString()] ?: 0L
+    val progress = if (video.duration > 0) (savedPos.toFloat() / video.duration.toFloat()).coerceIn(0f, 1f) else 0f
 
     Card(
         modifier = Modifier
@@ -129,6 +133,22 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
+
+                // "Resume" tag for discontinued videos
+                if (progress > 0.05f && progress < 0.95f) {
+                    Text(
+                        text = "▶ Resume",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(6.dp)
+                            .background(Color(0xFFFF5722), shape = RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+
+                // Duration Badge
                 Text(
                     text = formatDuration(video.duration),
                     color = Color.White,
@@ -139,7 +159,21 @@ fun VideoCard(video: VideoItem, onClick: () -> Unit) {
                         .background(Color.Black.copy(alpha = 0.8f), shape = RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 )
+
+                // Red Watch Progress Bar (like YouTube/VLC)
+                if (progress > 0f) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .align(Alignment.BottomCenter),
+                        color = Color.Red,
+                        trackColor = Color.Gray.copy(alpha = 0.5f)
+                    )
+                }
             }
+
             Text(
                 text = video.title,
                 color = Color.White,
